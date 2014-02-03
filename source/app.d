@@ -5,6 +5,8 @@ import std.regex;
 import std.file;
 import std.exception;
 import std.string;
+import std.array;
+import std.conv;
 private import stdlib = core.stdc.stdlib : exit;
 
 //int nextFile;
@@ -26,21 +28,37 @@ void main(string[] args)
     writeln(pathToPdf);
     try {
         //writeln(getStreams(getObj(readFiles(pathToPdf))));
-        writeln(getStreams(getObj(pathToPdf)));
+        getStreams(getObj(pathToPdf));
+        //writeln(getObj(pathToPdf));
     }
     catch(FileException fexc)
     {
         writeln("File not found in ", getcwd());
         exitProg(0);
     }
+    catch(ErrnoException oexc)
+    {
+        writeln("Cannot open file ");
+        exitProg(0);
+    }
 }
 
 string[] getObj(in string fileName) {
-	auto regexObj= regex(`obj(.*)$endobj`, "g");
+	auto regexObj= regex(`obj(.*)endobj`, "g");
 	string[] allObjects;
-    auto buffer= readText(fileName);
-	auto matches = match(buffer, regexObj);
-    enforce(matches);
+    File f= File(fileName, "r");
+    string str;
+    uint bufferSize= to!uint(f.size);
+    char[] buffer;
+    uint i= 0;
+    buffer.length= bufferSize;
+    f.rawRead(buffer);
+    //f.read(" %s", &buffer[i]);
+    str~=buffer;
+    writeln(str.length);
+    //string buffer= join(buffer);
+	auto matches = match(str, regexObj); // --------------- ISSUE HERE
+    assert(matches);
 	foreach(cap; matches.captures) {
 	  allObjects~= cap;
 	}
@@ -55,7 +73,7 @@ unittest{
 
 string[] getStreams(in string[] objects) {
     string[] allStreams;
-    auto regexProp= regex(`<</Length\s\d*\d/Filter/FlateDecode>>`, "g");
+    auto regexProp= regex(`<</Length(\s\d*)/Filter/FlateDecode>>`, "g");
     auto regexStream= regex(`stream(.*)endstream`, "g");
     //проверяем блоки свойств каждого обьекта на соответствие текстовому потоку
         //при совпадении - добавляем поток к результату
@@ -78,9 +96,13 @@ string readFiles(in string pathToPdf){
         if(!pathToPdf.isDir){
             inputFile= File(pathToPdf, "r");
         }
-    }  
+    }
+    //inputFile.checkPDF();
     //nextFile++;
-    return inputFile.name;
+    string fileName= inputFile.name;
+    inputFile.detach;
+    return fileName;
+    //return &inputFile;
 }
 unittest{
 
